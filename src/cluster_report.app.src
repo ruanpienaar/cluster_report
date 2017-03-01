@@ -1,0 +1,13 @@
+{application, cluster_report,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  hawk
+                 ]},
+  {mod, { cluster_report_app, []}},
+  {env, []}
+ ]}.
