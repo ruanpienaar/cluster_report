@@ -103,6 +103,6 @@ cluster_module_consistency([{Node,Mods}|T],R) ->
 compare_others({Node, Mods}, R, []) ->
     [{Node, Mods}|R];
 compare_others({Node, Mods}, R, [{Nodes,Mods}|T]) ->
-    lists:keyreplace(Nodes, 1, R, {[Node|Nodes], Mods});
+    lists:keyreplace(Nodes, 1, R, {lists:sort([Node|Nodes]), Mods});
 compare_others({Node, Mods}, R, [{_,_}|T]) ->
     compare_others({Node, Mods}, R, T).
