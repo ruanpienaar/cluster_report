@@ -26,12 +26,7 @@
 
 start() ->
     ok = application:start(hawk),
-    ok = application:start(cluster_report),
-
-    add_node('test1@mbp', test),
-    add_node('test2@mbp', test),
-    add_node('test3@mbp', test),
-    add_node('test4@mbp', test).
+    ok = application:start(cluster_report).
 
 add_node(Node, Cookie) ->
     {ok,_Pid} = hawk:add_node(Node, Cookie).
@@ -88,7 +83,7 @@ do_cluster_modules() ->
     lists:map(fun(Node) ->
         case rpc:call(Node, code, all_loaded, []) of
             Res when is_list(Res) ->
-                {Node, lists:sort(Res)};
+                {Node, lists:sort( [NN || {NN,_} <- Res] )};
             {badrpc,R} ->
                 throw({badrpc,R})
         end
@@ -127,7 +122,7 @@ cluster_module_consistency([{Node,Mods}|T],R) ->
 compare_others({Node, Mods}, R, []) ->
     [{Node, Mods}|R];
 compare_others({Node, Mods}, R, [{Nodes,Mods}|T]) ->
-    io:format("~p ~p~n~n~n", [Node, Nodes]),
+    % io:format("~p ~p~n~n~n", [Node, Nodes]),
     lists:keyreplace(Nodes, 1, R, {lists:sort([Node|Nodes]), Mods});
 compare_others({Node, Mods}, R, [{_,_}|T]) ->
     compare_others({Node, Mods}, R, T).
