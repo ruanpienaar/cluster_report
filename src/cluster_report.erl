@@ -6,20 +6,18 @@
     cluster_nodes/0,
     cluster_modules/0, cluster_modules/1,
     cluster_modules_extra_info/0, cluster_modules_extra_info/1,
-    cluster_applications/0, cluster_applications/1
-]).
-%% application:get_key(APP, modules).
+    cluster_applications/0,
+% ]).
 
--ifdef(TEST).
--export([
+% -ifdef(TEST).
+% -export([
     do_cluster_modules/0,
     do_cluster_modules/1,
     do_cluster_applications/0,
-    cluster_module_consistency/1, cluster_module_consistency/2,
-    compare_others/3,
-    cluster_application_consistency/2
+    consistency/1, consistency/2,
+    compare_others/3
 ]).
--endif.
+% -endif.
 
 %%------------------------------------------------------------------------------
 %% API
@@ -34,15 +32,15 @@ add_node(Node, Cookie) ->
 remove_node(Node) ->
     ok = hawk:remove_node(Node).
 
-discover_cluster() ->
-    ok.
+% discover_cluster() ->
+%     ok.
 
 cluster_nodes() ->
     hawk:nodes().
 
 cluster_modules() ->
     try
-        cluster_module_consistency(do_cluster_modules())
+        consistency(do_cluster_modules())
     catch
         C:E ->
             {error, C, E, erlang:get_stacktrace()}
@@ -50,7 +48,7 @@ cluster_modules() ->
 
 cluster_modules(App) ->
     try
-        cluster_module_consistency(do_cluster_modules(App))
+        consistency(do_cluster_modules(App))
     catch
         C:E ->
             {error, C, E, erlang:get_stacktrace()}
@@ -61,21 +59,18 @@ cluster_modules(App) ->
 cluster_modules_extra_info() ->
     ok.
 
-cluster_modules_extra_info(App) ->
+cluster_modules_extra_info(_App) ->
     ok.
 
+%% TODO: application description AND version is checked,
+%%       we might want to relax the application desc? maybe
 cluster_applications() ->
-    [Node1|_] = hawk:nodes(),
-    cluster_applications(Node1).
-
-cluster_applications(CorrectNode) ->
     try
-        cluster_application_consistency(CorrectNode, do_cluster_applications())
+        consistency(do_cluster_applications())
     catch
         C:E ->
             {error, C, E, erlang:get_stacktrace()}
     end.
-
 
 %%------------------------------------------------------------------------------
 
@@ -89,13 +84,14 @@ do_cluster_modules() ->
         end
     end, cluster_nodes()).
 
+-spec do_cluster_modules(atom()) -> list({node(), nonempty_list()}) | {badrpc, term()}.
 do_cluster_modules(App) ->
     lists:map(fun(Node) ->
         case rpc:call(Node, application, get_key, [App, modules]) of
             {ok,Res} when is_list(Res) ->
                 {Node, lists:sort(Res)};
             {badrpc,R} ->
-                throw({badrpc,R})
+                {badrpc,R}
         end
     end, cluster_nodes()).
 
@@ -105,39 +101,25 @@ do_cluster_applications() ->
             Res when is_list(Res) ->
                 {Node, lists:sort(Res)};
             {badrpc,R} ->
-                throw({badrpc,R})
+                {badrpc,R}
         end
     end, cluster_nodes()).
 
-cluster_module_consistency(L) ->
-    cluster_module_consistency(L,[]).
+consistency([{Node, Mods} | T]) ->
+    consistency(T, [{Node, Mods}]). %% use the first node
 
-cluster_module_consistency([],R) ->
+%% pass in a list of [ {Node, [NodeModules]}, ... ]
+%% and return the consistent, inconsistent modules
+consistency([], R) ->
     R;
-cluster_module_consistency([{Node,Mods}|T],[]) ->
-    cluster_module_consistency(T,[{[Node],Mods}]);
-cluster_module_consistency([{Node,Mods}|T],R) ->
-    cluster_module_consistency(T, compare_others({Node,Mods}, R, R)).
+consistency([{Node, Mods} | T], R) ->
+    consistency(T, compare_others({Node, Mods}, R, R)).
 
 compare_others({Node, Mods}, R, []) ->
-    [{Node, Mods}|R];
-compare_others({Node, Mods}, R, [{Nodes,Mods}|T]) ->
-    % io:format("~p ~p~n~n~n", [Node, Nodes]),
-    lists:keyreplace(Nodes, 1, R, {lists:sort([Node|Nodes]), Mods});
-compare_others({Node, Mods}, R, [{_,_}|T]) ->
+    [{Node, Mods} | R];
+compare_others({Node, Mods}, R, [{Other, Mods} | _T]) when is_list(Other) ->
+    lists:keyreplace(Other, 1, R, {lists:sort([Node | Other]), Mods});
+compare_others({Node, Mods}, R, [{Other, Mods} | _T]) when is_atom(Other) ->
+    lists:keyreplace(Other, 1, R, {lists:sort([Node | [Other]]), Mods});
+compare_others({Node, Mods}, R, [{_, _} | T]) ->
     compare_others({Node, Mods}, R, T).
-
-cluster_application_consistency(CorrectNode, Nodes) ->
-    ok.
-
-
-
-
- % {['test4@rpmbp.home'],
- %  [{application,"/Users/ruanpienaar/erlang/20.0/lib/kernel-5.3/ebin/application.beam"},
- %   {application_controller,"/Users/ruanpienaar/erlang/20.0/lib/kernel-5.3/ebin/application_controller.beam"},
- %   {application_master,"/Users/ruanpienaar/erlang/20.0/lib/kernel-5.3/ebin/application_master.beam"},
- %   {auth,"/Users/ruanpienaar/erlang/20.0/lib/kernel-5.3/ebin/auth.beam"}
- %  ]
- % }
- %
