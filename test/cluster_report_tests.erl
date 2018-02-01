@@ -314,9 +314,8 @@ DoClusterApplicationsResult =
         cluster_report:consistency(DoClusterApplicationsResult)
     ).
 
-cluster_application_consistency_inconsistency_test() ->
-    ok.
-
+% cluster_application_consistency_inconsistency_test() ->
+%     ?_test(true).
 
 cluster_report_integration_test_() ->
     {setup,
@@ -333,8 +332,8 @@ cluster_report_integration_test_() ->
         ok = application:stop(hawk)
      end,
      [
-        {foreach,
-         fun() ->
+        {foreachx,
+         fun(_) ->
             Cookie = erlang:get_cookie(),
             {ok, Host} = inet:gethostname(),
             {ok, SlaveNodeName1} = slave:start(Host, slave_node1),
@@ -351,7 +350,7 @@ cluster_report_integration_test_() ->
             ?assert(length(hawk:nodes())==3),
             [SlaveNodeName1, SlaveNodeName2, SlaveNodeName3]
          end,
-         fun([SlaveNodeName1, SlaveNodeName2, SlaveNodeName3]) ->
+         fun(_, [SlaveNodeName1, SlaveNodeName2, SlaveNodeName3]) ->
             ok = hawk:remove_node(SlaveNodeName1),
             ok = hawk:remove_node(SlaveNodeName2),
             ok = hawk:remove_node(SlaveNodeName3),
@@ -362,13 +361,13 @@ cluster_report_integration_test_() ->
             ?assert(length(hawk:nodes())==0)
          end,
          [
-            fun cluster_modules/1,
-            fun cluster_applications/1
+            {"cluster_modules", fun cluster_modules/2},
+            {"cluster_applications", fun cluster_applications/2}
          ]
         }
     ]}.
 
-cluster_modules(Slaves = [Node1, Node2, Node3]) ->
+cluster_modules(_, _Slaves = [Node1, Node2, Node3]) ->
     timer:sleep(100),
     ClusterModsResponse = cluster_report:cluster_modules(),
     %% check that all 3 slaves are consistent
@@ -381,9 +380,9 @@ cluster_modules(Slaves = [Node1, Node2, Node3]) ->
     %% Test some modules
     ?assertMatch(true, lists:member(lists, Mods)),
     ?assertMatch(true, lists:member(net_kernel, Mods)),
-    ?assertMatch(true, lists:member(erlang, Mods)).
+    ?_assertMatch(true, lists:member(erlang, Mods)).
 
-cluster_applications(Slaves = [Node1, Node2, Node3]) ->
+cluster_applications(_, Slaves = [Node1, Node2, Node3]) ->
     timer:sleep(100),
     %% check that all 3 slaves are consistent
     ClusterAppsResponse = cluster_report:cluster_applications(),
@@ -392,7 +391,6 @@ cluster_applications(Slaves = [Node1, Node2, Node3]) ->
         [{[Node1, Node2, Node3], [{kernel,_,_},{stdlib,_,_}]}],
         ClusterAppsResponse
     ),
-    ?assertEqual(ok, rpc:call(Node1, application, start, [asn13])),
+    ?assertEqual(ok, rpc:call(Node1, application, start, [asn1])),
     ?assertEqual(ok, rpc:call(Node2, application, start, [asn1])),
-    ?assertEqual(ok, rpc:call(Node3, application, start, [asn1])),
-    ?assert(true).
+    ?_assertEqual(ok, rpc:call(Node3, application, start, [asn1])).
